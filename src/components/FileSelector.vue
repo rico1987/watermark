@@ -34,7 +34,12 @@
                         <div
                             v-if="selectedFile"
                             class="mask"
-                            :style="{'top': top + 'px', 'bottom': bottom + 'px', 'right': right + 'px', 'left': left + 'px'}"
+                            :style="{
+                                'top': selectedFile.maskTop + 'px',
+                                'bottom': selectedFile.maskBottom + 'px',
+                                'right': selectedFile.maskRight + 'px',
+                                'left': selectedFile.maskLeft + 'px'
+                                }"
                         >
                             <span
                             id="center"
@@ -48,28 +53,28 @@
                             :class="{ 'moving': movingTarget === 'tl'}"
                             v-if="selectedFile"
                             @mousedown="onMouseDown()"
-                            :style="{'top': top + 'px', 'left': left + 'px'}"
+                            :style="{'top': selectedFile.maskTop + 'px', 'left': selectedFile.maskLeft + 'px'}"
                             class="anchor top-left"></span>
                         <span
                             id="tr"
                             :class="{ 'moving': movingTarget === 'tr'}"
                             v-if="selectedFile"
                             @mousedown="onMouseDown()"
-                            :style="{'top': top + 'px', 'right': right + 'px'}"
+                            :style="{'top': selectedFile.maskTop + 'px', 'right': selectedFile.maskRight + 'px'}"
                             class="anchor top-right"></span>
                         <span
                             id="bl"
                             :class="{ 'moving': movingTarget === 'bl'}"
                             v-if="selectedFile"
                             @mousedown="onMouseDown()"
-                            :style="{'bottom': bottom + 'px', 'left': left + 'px'}"
+                            :style="{'bottom': selectedFile.maskBottom + 'px', 'left': selectedFile.maskLeft + 'px'}"
                             class="anchor bottom-left"></span>
                         <span
                             id="br"
                             :class="{ 'moving': movingTarget === 'br'}"
                             v-if="selectedFile"
                             @mousedown="onMouseDown()"
-                            :style="{'bottom': bottom + 'px', 'right': right + 'px'}"
+                            :style="{'bottom': selectedFile.maskBottom + 'px', 'right': selectedFile.maskRight + 'px'}"
                             class="anchor bottom-right"></span>
 
                         <div class="content">
@@ -168,6 +173,11 @@ export default {
                 type: null,
                 width: null,
                 height: null,
+                maskTop: 0,
+                maskBottom: 0,
+                maskLeft: 0,
+                maskRight: 0,
+                touched: false,
             });
             const url = authentications['callback']['callbackUrl'];
             const callbackBody = authentications['callback']['callbackBody'];
@@ -245,69 +255,69 @@ export default {
                     const calLeft = event.clientX - parentScreenLeft;
                     const calTop = event.clientY - parrentScreenTop;
                     if (calLeft < 0) {
-                        this.left = 0;
-                    } else if (calLeft > this.parentWidth - this.right) {
-                        this.left = this.parentWidth - this.right - 1;
+                        this.selectedFile.maskLeft = 0;
+                    } else if (calLeft > this.parentWidth - this.selectedFile.maskRight) {
+                        this.selectedFile.maskLeft = this.parentWidth - this.selectedFile.maskRight - 1;
                     } else {
-                        this.left = calLeft;
+                        this.selectedFile.maskLeft = calLeft;
                     }
                     if (calTop < 0) {
-                        this.top = 0;
-                    } else if (calTop > this.parentHeight - this.bottom) {
-                        this.top = this.parentHeight - this.bottom - 1;
+                        this.selectedFile.maskTop = 0;
+                    } else if (calTop > this.parentHeight - this.selectedFile.maskBottom) {
+                        this.selectedFile.maskTop = this.parentHeight - this.selectedFile.maskBottom - 1;
                     } else {
-                        this.top = calTop;
+                        this.selectedFile.maskTop = calTop;
                     }
                 } else if (this.movingTarget === 'tr') {
                     const calRight = parentScreenLeft + this.parentWidth - event.clientX;
                     const calTop = event.clientY - parrentScreenTop;
                     if (calRight < 0) {
-                        this.right = 0;
-                    } else if (calRight > this.parentWidth - this.left) {
-                        this.right = this.parentWidth - this.left - 1;
+                        this.selectedFile.maskRight = 0;
+                    } else if (calRight > this.parentWidth - this.selectedFile.maskLeft) {
+                        this.selectedFile.maskRight = this.parentWidth - this.selectedFile.maskLeft - 1;
                     } else {
-                        this.right = calRight;
+                        this.selectedFile.maskRight = calRight;
                     }
                     if (calTop < 0) {
-                        this.top = 0;
-                    } else if (calTop > this.parentHeight - this.bottom) {
-                        this.top = this.parentHeight - this.bottom - 1;
+                        this.selectedFile.maskTop = 0;
+                    } else if (calTop > this.parentHeight - this.selectedFile.maskBottom) {
+                        this.selectedFile.maskTop = this.parentHeight - this.selectedFile.maskBottom - 1;
                     } else {
-                        this.top = calTop;
+                        this.selectedFile.maskTop = calTop;
                     }
                 } else if (this.movingTarget === 'bl') {
                     const calLeft = event.clientX - parentScreenLeft;
                     const calBottom = this.parentHeight + parrentScreenTop - event.clientY;
                     if (calLeft < 0) {
-                        this.left = 0;
-                    } else if (calLeft > this.parentWidth - this.right) {
-                        this.left = this.parentWidth - this.right - 1;
+                        this.selectedFile.maskLeft = 0;
+                    } else if (calLeft > this.parentWidth - this.selectedFile.maskRight) {
+                        this.selectedFile.maskLeft = this.parentWidth - this.selectedFile.maskRight - 1;
                     } else {
-                        this.left = calLeft;
+                        this.selectedFile.maskLeft = calLeft;
                     }
                     if (calBottom < 0) {
-                        this.bottom = 0;
-                    } else if (calBottom > this.parentHeight - this.top - 1) {
-                        this.bottom = this.parentHeight - this.top - 1;
+                        this.selectFile.maskBottom = 0;
+                    } else if (calBottom > this.parentHeight - this.selectedFile.maskTop - 1) {
+                        this.selectFile.maskBottom = this.parentHeight - this.selectedFile.maskTop - 1;
                     } else {
-                        this.bottom = calBottom;
+                        this.selectedFile.maskBottom = calBottom;
                     }
                 } else if (this.movingTarget === 'br') {
                     const calRight = parentScreenLeft + this.parentWidth - event.clientX;
                     const calBottom = this.parentHeight + parrentScreenTop - event.clientY;
                     if (calRight < 0) {
-                        this.right = 0;
-                    } else if (calRight > this.parentWidth - this.left) {
-                        this.right = this.parentWidth - this.left - 1;
+                        this.selectedFile.maskRight = 0;
+                    } else if (calRight > this.parentWidth - this.selectedFile.maskLeft) {
+                        this.selectedFile.maskRight = this.parentWidth - this.selectedFile.maskLeft - 1;
                     } else {
-                        this.right = calRight;
+                        this.selectedFile.maskRight = calRight;
                     }
                     if (calBottom < 0) {
-                        this.bottom = 0;
-                    } else if (calBottom > this.parentHeight - this.top - 1) {
-                        this.bottom = this.parentHeight - this.top - 1;
+                        this.selectedFile.maskBottom = 0;
+                    } else if (calBottom > this.parentHeight - this.selectedFile.maskTop - 1) {
+                        this.selectedFile.maskBottom = this.parentHeight - this.selectedFile.maskTop - 1;
                     } else {
-                        this.bottom = calBottom;
+                        this.selectedFile.maskBottom = calBottom;
                     }
                 }
             }
@@ -328,6 +338,7 @@ export default {
         },
 
         selectFile: function(file) {
+            this.isMoving = false;
             this.selectedFile = file;
             // 计算图片高度
             const positonParent = this.$refs['position-container'];
@@ -337,7 +348,11 @@ export default {
                 this.parentHeight = file['height'] * this.parentWidth / file['width'];
                 this.top = this.bottom = this.parentHeight * 0.3;
             }
-
+            if (!this.selectedFile.touched) {
+                this.selectedFile.maskTop = this.selectedFile.maskBottom = this.bottom;
+                this.selectedFile.maskLeft = this.selectedFile.maskRight = this.left;
+                this.selectedFile.touched = true;
+            }
         },
     },
 };
