@@ -18,8 +18,9 @@
                                 @click="selectFile(file)"
                             >
                                 <td :class="{ 'uploaded': file.progress === 1}">
-                                    {{ file.name }}
-                                    <progress v-if="file.progress < 1" :value="Math.floor(file.progress * 100)" max="100"></progress>
+                                    <span class="file-name">{{ file.name }}</span>
+                                    <progress v-if="file.progress < 1 || true" :value="Math.floor(file.progress * 100)" max="100"></progress>
+                                    <span v-if="file.status === 'processing'">转换中...<span></span></span>
                                 </td>
                             </tr>
                         </tbody>
@@ -27,56 +28,62 @@
                     <p class="btn btn-primary" style="width: 100%;">上传文件</p>
                 </div>
                 <div class="col-md-9">
-                    <div class="preview" @mouseup="onMouseUp()" @mousemove="onMouseMove()"  ref="position-container">
+                    <div class="submit">
+                        <span @click="submit">提交</span>
+                    </div>
+                    <div class="preview" @mouseup="onMouseUp()" @mousedown="onMouseDown()" @mousemove="onMouseMove()"  ref="position-container">
                         <div class="upload-info" v-if="uploaded < uploadQueue.length">
                             <p>当前上传 {{uploaded}} / {{uploadQueue.length}}</p>
                         </div>
-                        <div
-                            v-if="selectedFile"
-                            class="mask"
-                            :style="{
-                                'top': selectedFile.maskTop + 'px',
-                                'bottom': selectedFile.maskBottom + 'px',
-                                'right': selectedFile.maskRight + 'px',
-                                'left': selectedFile.maskLeft + 'px'
-                                }"
-                        >
-                            <span
-                            id="center"
-                            v-if="selectedFile"
-                            @mousedown="onMouseDown()"
-                            :class="{ 'moving': movingTarget === 'center'}"
-                            class="anchor center top-left"></span>
+                        <div class="wrapper" v-if="selectedFile">
+                            <div v-bind:key="mask.id" v-for="mask in selectedFile.masks">
+                                <div
+                                    v-if="mask"
+                                    class="mask"
+                                    :style="{
+                                        'top': mask.maskTop + 'px',
+                                        'bottom': mask.maskBottom + 'px',
+                                        'right': mask.maskRight + 'px',
+                                        'left': mask.maskLeft + 'px'
+                                        }"
+                                >
+                                    <span
+                                    id="center"
+                                    v-if="mask"
+                                    @mousedown="onMouseDown(mask.id)"
+                                    :class="{ 'moving': movingTarget === 'center' && movingMaskId === mask.id}"
+                                    class="anchor center top-left"></span>
+                                </div>
+                                <span
+                                    id="tl"
+                                    :class="{ 'moving': movingTarget === 'tl' && movingMaskId === mask.id}"
+                                    v-if="mask"
+                                    @mousedown="onMouseDown(mask.id)"
+                                    :style="{'top': mask.maskTop + 'px', 'left': mask.maskLeft + 'px'}"
+                                    class="anchor top-left"></span>
+                                <span
+                                    id="tr"
+                                    :class="{ 'moving': movingTarget === 'tr' && movingMaskId === mask.id}"
+                                    v-if="mask"
+                                    @mousedown="onMouseDown(mask.id)"
+                                    :style="{'top': mask.maskTop + 'px', 'right': mask.maskRight + 'px'}"
+                                    class="anchor top-right"></span>
+                                <span
+                                    id="bl"
+                                    :class="{ 'moving': movingTarget === 'bl' && movingMaskId === mask.id}"
+                                    v-if="mask"
+                                    @mousedown="onMouseDown(mask.id)"
+                                    :style="{'bottom': mask.maskBottom + 'px', 'left': mask.maskLeft + 'px'}"
+                                    class="anchor bottom-left"></span>
+                                <span
+                                    id="br"
+                                    :class="{ 'moving': movingTarget === 'br' && movingMaskId === mask.id}"
+                                    v-if="mask"
+                                    @mousedown="onMouseDown(mask.id)"
+                                    :style="{'bottom': mask.maskBottom + 'px', 'right': mask.maskRight + 'px'}"
+                                    class="anchor bottom-right"></span>
+                            </div>
                         </div>
-                        <span
-                            id="tl"
-                            :class="{ 'moving': movingTarget === 'tl'}"
-                            v-if="selectedFile"
-                            @mousedown="onMouseDown()"
-                            :style="{'top': selectedFile.maskTop + 'px', 'left': selectedFile.maskLeft + 'px'}"
-                            class="anchor top-left"></span>
-                        <span
-                            id="tr"
-                            :class="{ 'moving': movingTarget === 'tr'}"
-                            v-if="selectedFile"
-                            @mousedown="onMouseDown()"
-                            :style="{'top': selectedFile.maskTop + 'px', 'right': selectedFile.maskRight + 'px'}"
-                            class="anchor top-right"></span>
-                        <span
-                            id="bl"
-                            :class="{ 'moving': movingTarget === 'bl'}"
-                            v-if="selectedFile"
-                            @mousedown="onMouseDown()"
-                            :style="{'bottom': selectedFile.maskBottom + 'px', 'left': selectedFile.maskLeft + 'px'}"
-                            class="anchor bottom-left"></span>
-                        <span
-                            id="br"
-                            :class="{ 'moving': movingTarget === 'br'}"
-                            v-if="selectedFile"
-                            @mousedown="onMouseDown()"
-                            :style="{'bottom': selectedFile.maskBottom + 'px', 'right': selectedFile.maskRight + 'px'}"
-                            class="anchor bottom-right"></span>
-
                         <div class="content">
                             <div class="image" ref="image-container" v-if="selectedFile && selectedFile.type === 'image'">
                                 <img draggable="false" v-if="selectedFile.url" :src="selectedFile.url" />
@@ -90,7 +97,7 @@
 </template>
 
 <script>
-// import { upload, } from '@/api/storage';
+import {createTask, getTaskStatus, } from '@/api/watermark';
 import {generateRandomString, } from '@/utils';
 import Cookies from 'js-cookie';
 
@@ -101,8 +108,10 @@ export default {
             parentHeight: 0,
             parentWidth: 0,
             isMoving: false,
+            isCreating: false,
             isLoaded: false,
             movingTarget: null,
+            movingMaskId: null,
             right: 0,
             left: 0,
             top: 0,
@@ -132,6 +141,54 @@ export default {
     },
 
     methods: {
+
+        submit: function() {
+            // 提交任务
+            for (let i = 0; i < this.uploadQueue.length; i++) {
+                this.submitSingleTask(this.uploadQueue[i]);
+                console.log(this.uploadQueue[i]);
+            }
+        },
+
+        submitSingleTask: function(resource) {
+            const postData = {
+                file_id: resource.resource_id,
+                args: {
+                    watermarks: [],
+                },
+            };
+            const ratio = resource.width / this.parentWidth;
+            const masks = resource.masks;
+            for (let i = 0; i < masks.length; i++) {
+                postData.args.watermarks.push({
+                    x: Math.floor(masks[i].maskLeft * ratio),
+                    y: Math.floor(masks[i].maskTop * ratio),
+                    w: Math.floor((this.parentWidth - masks[i].maskLeft - masks[i].maskRight) * ratio),
+                    h: Math.floor((this.parentHeight - masks[i].maskTop - masks[i].maskBottom) * ratio),
+                });
+            }
+            createTask(postData)
+                .then((res) => {
+                    const index = this.uploadQueue.findIndex((ele) => ele.resource_id === resource.resource_id);
+                    if (res.data.status === '1') {
+                        this.uploadQueue[index].status === 'processing';
+                        this.uploadQueue[index].task_id = res.data.data.task_id;
+                        this.uploadQueue[index].query_interval = setInterval(() => {
+                            getTaskStatus(this.uploadQueue[index].task_id)
+                                .then((res) => {
+                                    console.log(res.data.data);
+                                })
+                                .catch((err) => {
+                                    console.log(err);
+                                });
+                        }, 500);
+                    }
+                })
+                .catch((err) => {
+                    throw (err);
+                });
+        },
+
         uploadFile: function() {
             this.$refs.fileInput.click();
         },
@@ -166,6 +223,10 @@ export default {
             file['key'] = key;
             this.uploadQueue.push({
                 name: file.name,
+                resource_id: null,
+                task_id: null,
+                process_progress: 0,
+                query_interval: null,
                 key: key,
                 progress: 0,
                 status: 'uploading',
@@ -173,10 +234,15 @@ export default {
                 type: null,
                 width: null,
                 height: null,
-                maskTop: 0,
-                maskBottom: 0,
-                maskLeft: 0,
-                maskRight: 0,
+                masks: [
+                    {
+                        id: 0,
+                        maskTop: 0,
+                        maskBottom: 0,
+                        maskLeft: 0,
+                        maskRight: 0,
+                    },
+                ],
                 touched: false,
             });
             const url = authentications['callback']['callbackUrl'];
@@ -212,6 +278,7 @@ export default {
                                 this.uploadQueue[index]['url'] = res.data.data.resource.image_url;
                                 this.uploadQueue[index]['width'] = res.data.data.resource.image_width;
                                 this.uploadQueue[index]['height'] = res.data.data.resource.image_height;
+                                this.uploadQueue[index]['resource_id'] = res.data.data.resource.resource_id;
                             }
                             this.uploaded++;
                         }
@@ -236,14 +303,40 @@ export default {
             }
         },
 
-        onMouseDown: function() {
-            this.movingTarget = event.target.id;
-            this.isMoving = true;
+        onMouseDown: function(id) {
+            if (id || id === 0) {
+                this.movingMaskId = id;
+                this.movingTarget = event.target.id;
+                this.isMoving = true;
+                this.isCreating = false;
+                event.stopPropagation();
+            } else if (event.target.getAttribute('class') !== 'mask') {
+                if (this.selectedFile.masks.length > 4) {
+                    alert('最多只能添加5个图层');
+                    return false;
+                }
+                const maskLength = this.selectedFile.masks.length;
+                const positonParent = this.$refs['position-container'];
+                const parentScreenLeft = positonParent.offsetLeft;
+                const parrentScreenTop = positonParent.offsetTop;
+                this.selectedFile.masks.push({
+                    id: maskLength,
+                    maskTop: event.clientY - parrentScreenTop,
+                    maskBottom: this.parentHeight - event.clientY + parrentScreenTop,
+                    maskLeft: event.clientX - parentScreenLeft,
+                    maskRight: this.parentWidth - event.clientX + parentScreenLeft,
+                });
+                this.isCreating = true;
+                this.isMoving = false;
+            }
         },
 
         onMouseUp: function() {
             this.movingTarget = null;
+            this.movingMaskId = null;
+            this.isCreating = false;
             this.isMoving = false;
+            console.log(this.isCreating);
         },
 
         onMouseMove: function() {
@@ -255,69 +348,114 @@ export default {
                     const calLeft = event.clientX - parentScreenLeft;
                     const calTop = event.clientY - parrentScreenTop;
                     if (calLeft < 0) {
-                        this.selectedFile.maskLeft = 0;
-                    } else if (calLeft > this.parentWidth - this.selectedFile.maskRight) {
-                        this.selectedFile.maskLeft = this.parentWidth - this.selectedFile.maskRight - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = 0;
+                    } else if (calLeft > this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskRight) {
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskRight - 1;
                     } else {
-                        this.selectedFile.maskLeft = calLeft;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = calLeft;
                     }
                     if (calTop < 0) {
-                        this.selectedFile.maskTop = 0;
-                    } else if (calTop > this.parentHeight - this.selectedFile.maskBottom) {
-                        this.selectedFile.maskTop = this.parentHeight - this.selectedFile.maskBottom - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = 0;
+                    } else if (calTop > this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskBottom) {
+                        this.selectedFile.masks[this.movingMaskId].maskTop = this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskBottom - 1;
                     } else {
-                        this.selectedFile.maskTop = calTop;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = calTop;
                     }
                 } else if (this.movingTarget === 'tr') {
                     const calRight = parentScreenLeft + this.parentWidth - event.clientX;
                     const calTop = event.clientY - parrentScreenTop;
                     if (calRight < 0) {
-                        this.selectedFile.maskRight = 0;
-                    } else if (calRight > this.parentWidth - this.selectedFile.maskLeft) {
-                        this.selectedFile.maskRight = this.parentWidth - this.selectedFile.maskLeft - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = 0;
+                    } else if (calRight > this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskLeft) {
+                        this.selectedFile.masks[this.movingMaskId].maskRight = this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskLeft - 1;
                     } else {
-                        this.selectedFile.maskRight = calRight;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = calRight;
                     }
                     if (calTop < 0) {
-                        this.selectedFile.maskTop = 0;
-                    } else if (calTop > this.parentHeight - this.selectedFile.maskBottom) {
-                        this.selectedFile.maskTop = this.parentHeight - this.selectedFile.maskBottom - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = 0;
+                    } else if (calTop > this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskBottom) {
+                        this.selectedFile.masks[this.movingMaskId].maskTop = this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskBottom - 1;
                     } else {
-                        this.selectedFile.maskTop = calTop;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = calTop;
                     }
                 } else if (this.movingTarget === 'bl') {
                     const calLeft = event.clientX - parentScreenLeft;
                     const calBottom = this.parentHeight + parrentScreenTop - event.clientY;
                     if (calLeft < 0) {
-                        this.selectedFile.maskLeft = 0;
-                    } else if (calLeft > this.parentWidth - this.selectedFile.maskRight) {
-                        this.selectedFile.maskLeft = this.parentWidth - this.selectedFile.maskRight - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = 0;
+                    } else if (calLeft > this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskRight) {
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskRight - 1;
                     } else {
-                        this.selectedFile.maskLeft = calLeft;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = calLeft;
                     }
                     if (calBottom < 0) {
-                        this.selectFile.maskBottom = 0;
-                    } else if (calBottom > this.parentHeight - this.selectedFile.maskTop - 1) {
-                        this.selectFile.maskBottom = this.parentHeight - this.selectedFile.maskTop - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = 0;
+                    } else if (calBottom > this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskTop - 1) {
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskTop - 1;
                     } else {
-                        this.selectedFile.maskBottom = calBottom;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = calBottom;
                     }
                 } else if (this.movingTarget === 'br') {
                     const calRight = parentScreenLeft + this.parentWidth - event.clientX;
                     const calBottom = this.parentHeight + parrentScreenTop - event.clientY;
                     if (calRight < 0) {
-                        this.selectedFile.maskRight = 0;
-                    } else if (calRight > this.parentWidth - this.selectedFile.maskLeft) {
-                        this.selectedFile.maskRight = this.parentWidth - this.selectedFile.maskLeft - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = 0;
+                    } else if (calRight > this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskLeft) {
+                        this.selectedFile.masks[this.movingMaskId].maskRight = this.parentWidth - this.selectedFile.masks[this.movingMaskId].maskLeft - 1;
                     } else {
-                        this.selectedFile.maskRight = calRight;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = calRight;
                     }
                     if (calBottom < 0) {
-                        this.selectedFile.maskBottom = 0;
-                    } else if (calBottom > this.parentHeight - this.selectedFile.maskTop - 1) {
-                        this.selectedFile.maskBottom = this.parentHeight - this.selectedFile.maskTop - 1;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = 0;
+                    } else if (calBottom > this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskTop - 1) {
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = this.parentHeight - this.selectedFile.masks[this.movingMaskId].maskTop - 1;
                     } else {
-                        this.selectedFile.maskBottom = calBottom;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = calBottom;
+                    }
+                } else if (this.movingTarget === 'center') {
+                    const calX = event.movementX;
+                    const calY = event.movementY;
+                    if (this.selectedFile.masks[this.movingMaskId].maskLeft + calX < 0) {
+                        const preLeft = this.selectedFile.masks[this.movingMaskId].maskLeft;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = this.selectedFile.masks[this.movingMaskId].maskRight - preLeft;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = 0;
+                    } else if (this.selectedFile.masks[this.movingMaskId].maskRight - calX < 0) {
+                        const preRight = this.selectedFile.masks[this.movingMaskId].maskRight;
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = this.selectedFile.masks[this.movingMaskId].maskLeft + preRight;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = 0;
+                    } else {
+                        this.selectedFile.masks[this.movingMaskId].maskLeft = this.selectedFile.masks[this.movingMaskId].maskLeft + calX;
+                        this.selectedFile.masks[this.movingMaskId].maskRight = this.selectedFile.masks[this.movingMaskId].maskRight - calX;
+                    }
+                    if (this.selectedFile.masks[this.movingMaskId].maskTop + calY < 0) {
+                        const preTop = this.selectedFile.masks[this.movingMaskId].maskTop;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = this.selectedFile.masks[this.movingMaskId].maskBottom - preTop;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = 0;
+                    } else if (this.selectedFile.masks[this.movingMaskId].maskBottom - calY < 0) {
+                        const preBottom = this.selectedFile.masks[this.movingMaskId].maskBottom;
+                        this.selectedFile.masks[this.movingMaskId].maskTop = this.selectedFile.masks[this.movingMaskId].maskTop + preBottom;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = 0;
+                    } else {
+                        this.selectedFile.masks[this.movingMaskId].maskTop = this.selectedFile.masks[this.movingMaskId].maskTop + calY;
+                        this.selectedFile.masks[this.movingMaskId].maskBottom = this.selectedFile.masks[this.movingMaskId].maskBottom - calY;
+                    }
+                }
+            } else if (this.isCreating) {
+                const calX = event.movementX;
+                const calY = event.movementY;
+                const maskLength = this.selectedFile.masks.length;
+                if (calX > 0) {
+                    if (this.selectedFile.masks[maskLength - 1].maskRight - calX < 0) {
+                        this.selectedFile.masks[maskLength - 1].maskRight = 0;
+                    } else {
+                        this.selectedFile.masks[maskLength - 1].maskRight = this.selectedFile.masks[maskLength - 1].maskRight - calX;
+                    }
+                }
+                if (calY > 0) {
+                    if (this.selectedFile.masks[maskLength - 1].maskBottom - calY < 0) {
+                        this.selectedFile.masks[maskLength - 1].maskBottom = 0;
+                    } else {
+                        this.selectedFile.masks[maskLength - 1].maskBottom = this.selectedFile.masks[maskLength - 1].maskBottom - calY;
                     }
                 }
             }
@@ -349,8 +487,8 @@ export default {
                 this.top = this.bottom = this.parentHeight * 0.3;
             }
             if (!this.selectedFile.touched) {
-                this.selectedFile.maskTop = this.selectedFile.maskBottom = this.bottom;
-                this.selectedFile.maskLeft = this.selectedFile.maskRight = this.left;
+                this.selectedFile.masks[0]['maskTop'] = this.selectedFile.masks[0]['maskBottom'] = this.bottom;
+                this.selectedFile.masks[0]['maskLeft'] = this.selectedFile.masks[0]['maskRight'] = this.left;
                 this.selectedFile.touched = true;
             }
         },
@@ -391,7 +529,7 @@ td.uploaded{
 }
 .preview .mask{
     position: absolute;
-    border: 1px solid #eee;
+    border: 1px solid blue;
     background-color: aqua;
     opacity: 0.4;
 }
@@ -402,11 +540,9 @@ span.anchor {
     display: block;
     position: absolute;
     z-index: 10;
-    background-color: red;
 }
 span.center{
     position: absolute;
-    background-color: blue;
     display: block;
     top: 10px;
     left: 10px;

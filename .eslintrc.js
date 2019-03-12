@@ -51,7 +51,7 @@ module.exports = {
     "key-spacing": [2, { "beforeColon": false, "afterColon": true }],
     "linebreak-style": 0,
     "lines-around-comment": 0,
-    "max-len": ["error", { "code": 150, "tabWidth": 4 }],
+    "max-len": ["error", { "code": 200, "tabWidth": 4 }],
     "max-nested-callbacks": 0,
     "new-cap": [2, { "newIsCap": true, "capIsNew": false }],
     "new-parens": 2,
