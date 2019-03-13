@@ -17,7 +17,7 @@
                                 v-for="file in uploadQueue"
                                 @click="selectFile(file)"
                             >
-                                <td :class="{ 'uploaded': file.progress === 1}">
+                                <td :class="{ 'uploaded': file.width && file.height}">
                                     <span class="file-name">{{ file.name }}</span>
                                     <span v-if="file.status === 'uploading'">上传中...<span>{{Math.floor(file.progress*100)}}%</span></span>
                                     <span v-if="file.status === 'processing'">转换中...<span>{{file.process_progress}}%</span></span>
@@ -630,6 +630,10 @@ span.center:hover {
 .preview .content .image, .preview .content .video {
     width: 100%;
     height: 100%;
+}
+.preview .content .video {
+    position: relative;
+    z-index: -1;
 }
 .preview .content .image img, .preview .content .video video {
     width: 100%;
