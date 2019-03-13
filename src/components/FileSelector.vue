@@ -313,11 +313,29 @@ export default {
                                 const resource_id = res.data.data.resource.resource_id;
                                 // this.uploadQueue[index]['url'] = res.data.data.resource.video_url;
                                 this.uploadQueue[index]['resource_id'] = resource_id;
+                                const _this = this;
                                 // 视频还需要单独请求其他接口获取视频信息
-                                getResourceInfo(resource_id)
-                                    .then((response) => {
-                                        debugger
-                                    }); 
+                                let query_interval = setInterval(() => {
+                                    getResourceInfo(resource_id)
+                                        .then((response) => {
+                                            if (response.data.status === '1') {
+                                                if (response.data.data.width && response.data.data.height) {
+                                                    console.log(_this.uploadQueue[index]);
+                                                    _this.uploadQueue[index]['progress'] = 1;
+                                                    _this.uploadQueue[index]['status'] = 'uploaded';
+                                                    _this.uploadQueue[index]['url'] = response.data.data.video_url;
+                                                    _this.uploadQueue[index]['width'] = response.data.data.width;
+                                                    _this.uploadQueue[index]['height'] = response.data.data.height;
+                                                    _this.uploaded++;
+                                                    clearInterval(query_interval);
+                                                    query_interval = null;
+                                                    console.log(_this.uploadQueue[index]);
+                                                }
+                                            } else {
+                                                alert('请求失败');
+                                            }
+                                        });
+                                }, 1000);
                             }
                         }
                     }
@@ -514,8 +532,10 @@ export default {
         },
 
         selectFile: function(file) {
+            console.log(file);
             if (file.status === 'uploading') {
                 alert('上传中，请稍等');
+                return false;
             }
             this.isMoving = false;
             this.selectedFile = file;
@@ -524,6 +544,9 @@ export default {
             this.parentWidth = positonParent.offsetWidth;
             this.right = this.left = this.parentWidth * 0.3;
             if (file['type'] === 'image') {
+                this.parentHeight = file['height'] * this.parentWidth / file['width'];
+                this.top = this.bottom = this.parentHeight * 0.3;
+            } else if (file['type'] === 'video') {
                 this.parentHeight = file['height'] * this.parentWidth / file['width'];
                 this.top = this.bottom = this.parentHeight * 0.3;
             }
