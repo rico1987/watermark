@@ -1,6 +1,6 @@
 <template>
     <div class="container">
-        <div class="file-selector" v-if="currentRouter === 'uploader'">
+        <div class="file-selector" v-if="currentRouter === 'uploader' && !loading">
             <div class="jumbotron" @click="uploadFile()">
             <span>+</span>
             </div>
@@ -19,8 +19,10 @@
                             >
                                 <td :class="{ 'uploaded': file.progress === 1}">
                                     <span class="file-name">{{ file.name }}</span>
-                                    <progress v-if="file.progress < 1 || true" :value="Math.floor(file.progress * 100)" max="100"></progress>
-                                    <span v-if="file.status === 'processing'">转换中...<span></span></span>
+                                    <span v-if="file.status === 'uploading'">上传中...<span>{{Math.floor(file.progress*100)}}%</span></span>
+                                    <span v-if="file.status === 'processing'">转换中...<span>{{file.process_progress}}%</span></span>
+                                    <span v-if="file.status === 'finished'">处理完成<a :href="file.processed_url" target="_blank">点击下载</a></span>
+                                    <span v-if="file.status === 'failed'">处理失败</span>
                                 </td>
                             </tr>
                         </tbody>
@@ -29,7 +31,7 @@
                 </div>
                 <div class="col-md-9">
                     <div class="submit">
-                        <span @click="submit">提交</span>
+                        <span class="btn btn-primary" @click="submit">提交</span>
                     </div>
                     <div class="preview" @mouseup="onMouseUp()" @mousedown="onMouseDown()" @mousemove="onMouseMove()"  ref="position-container">
                         <div class="upload-info" v-if="uploaded < uploadQueue.length">
@@ -88,6 +90,10 @@
                             <div class="image" ref="image-container" v-if="selectedFile && selectedFile.type === 'image'">
                                 <img draggable="false" v-if="selectedFile.url" :src="selectedFile.url" />
                             </div>
+                            <div class="video" ref="video-container" v-if="selectedFile && selectedFile.type === 'video'">
+                                <video draggable="false" v-if="selectedFile.url" :src="selectedFile.url" controls="controls">
+                                </video>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -105,6 +111,7 @@ export default {
     name: 'FileSelector',
     data() {
         return {
+            loading: false,
             parentHeight: 0,
             parentWidth: 0,
             isMoving: false,
@@ -129,6 +136,7 @@ export default {
     },
 
     created: function() {
+        this.loading = true;
         const authentications = JSON.parse(Cookies.get('authentications'));
         // eslint-disable-next-line
         this.client = new OSS({
@@ -138,6 +146,7 @@ export default {
             stsToken: authentications.security_token,
             bucket: authentications.bucket,
         });
+        this.loading = false;
     },
 
     methods: {
@@ -171,12 +180,31 @@ export default {
                 .then((res) => {
                     const index = this.uploadQueue.findIndex((ele) => ele.resource_id === resource.resource_id);
                     if (res.data.status === '1') {
-                        this.uploadQueue[index].status === 'processing';
+                        this.uploadQueue[index].status = 'processing';
                         this.uploadQueue[index].task_id = res.data.data.task_id;
                         this.uploadQueue[index].query_interval = setInterval(() => {
                             getTaskStatus(this.uploadQueue[index].task_id)
                                 .then((res) => {
                                     console.log(res.data.data);
+                                    if (res.data.status === '1') {
+                                        const resource_id = res.data.data.source_file.resource_id;
+                                        const index = this.uploadQueue.findIndex((ele) => ele.resource_id === resource_id);
+                                        if (res.data.data.status === 2) {
+                                            // 处理成功
+                                            this.uploadQueue[index].status = 'finished';
+                                            clearInterval(this.uploadQueue[index].query_interval);
+                                            this.uploadQueue[index].query_interval = null;
+                                            this.uploadQueue[index].processed_url = res.data.data.target_file && res.data.data.target_file.url;
+                                        } else if (res.data.data.status === -10) {
+                                            // 处理失败
+                                            this.uploadQueue[index].status = 'failed';
+                                            clearInterval(this.uploadQueue[index].query_interval);
+                                            this.uploadQueue[index].query_interval = null;
+                                        } else if (res.data.data.status === 1) {
+                                            // 处理中
+                                            this.uploadQueue[index].process_progress = res.data.data.progress;
+                                        }
+                                    }
                                 })
                                 .catch((err) => {
                                     console.log(err);
@@ -227,6 +255,7 @@ export default {
                 task_id: null,
                 process_progress: 0,
                 query_interval: null,
+                processed_url: null,
                 key: key,
                 progress: 0,
                 status: 'uploading',
@@ -278,6 +307,9 @@ export default {
                                 this.uploadQueue[index]['url'] = res.data.data.resource.image_url;
                                 this.uploadQueue[index]['width'] = res.data.data.resource.image_width;
                                 this.uploadQueue[index]['height'] = res.data.data.resource.image_height;
+                                this.uploadQueue[index]['resource_id'] = res.data.data.resource.resource_id;
+                            } else if (this.uploadQueue[index]['type'] === 'video') {
+                                this.uploadQueue[index]['url'] = res.data.data.resource.video_url;
                                 this.uploadQueue[index]['resource_id'] = res.data.data.resource.resource_id;
                             }
                             this.uploaded++;
@@ -476,6 +508,9 @@ export default {
         },
 
         selectFile: function(file) {
+            if (file.status === 'uploading') {
+                alert('上传中，请稍等');
+            }
             this.isMoving = false;
             this.selectedFile = file;
             // 计算图片高度
@@ -563,11 +598,11 @@ span.center:hover {
     width: 100%;
     height: 100%;
 }
-.preview .content .image {
+.preview .content .image, .preview .content .video {
     width: 100%;
     height: 100%;
 }
-.preview .content .image img {
+.preview .content .image img, .preview .content .video video {
     width: 100%;
     height: auto;
 }
