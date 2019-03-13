@@ -103,7 +103,7 @@
 </template>
 
 <script>
-import {createTask, getTaskStatus, } from '@/api/watermark';
+import {createTask, getTaskStatus, getResourceInfo, } from '@/api/watermark';
 import {generateRandomString, } from '@/utils';
 import Cookies from 'js-cookie';
 
@@ -300,19 +300,25 @@ export default {
                             }
                         }
                         if (index > -1) {
-                            this.uploadQueue[index]['progress'] = 1;
-                            this.uploadQueue[index]['status'] = 'uploaded';
                             this.uploadQueue[index]['type'] = res.data.data.resource.type;
                             if (this.uploadQueue[index]['type'] === 'image') {
+                                this.uploadQueue[index]['progress'] = 1;
+                                this.uploadQueue[index]['status'] = 'uploaded';
                                 this.uploadQueue[index]['url'] = res.data.data.resource.image_url;
                                 this.uploadQueue[index]['width'] = res.data.data.resource.image_width;
                                 this.uploadQueue[index]['height'] = res.data.data.resource.image_height;
                                 this.uploadQueue[index]['resource_id'] = res.data.data.resource.resource_id;
+                                this.uploaded++;
                             } else if (this.uploadQueue[index]['type'] === 'video') {
-                                this.uploadQueue[index]['url'] = res.data.data.resource.video_url;
-                                this.uploadQueue[index]['resource_id'] = res.data.data.resource.resource_id;
+                                const resource_id = res.data.data.resource.resource_id;
+                                // this.uploadQueue[index]['url'] = res.data.data.resource.video_url;
+                                this.uploadQueue[index]['resource_id'] = resource_id;
+                                // 视频还需要单独请求其他接口获取视频信息
+                                getResourceInfo(resource_id)
+                                    .then((response) => {
+                                        debugger
+                                    }); 
                             }
-                            this.uploaded++;
                         }
                     }
                 });

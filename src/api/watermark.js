@@ -21,3 +21,7 @@ export function createTask(data) {
 export function getTaskStatus(task_id) {
     return fetch.get(`/tasks/${task_id}`);
 }
+
+export function getResourceInfo(resource_id) {
+    return fetch.get(`/resources/${resource_id}`);
+}
